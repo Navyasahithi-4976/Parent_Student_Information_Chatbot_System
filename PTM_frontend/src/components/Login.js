@@ -1,170 +1,89 @@
-import React, { useState } from 'react';
-import './Login.css';
+import React, { useState } from "react";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import "./login.css";
+import { API_BASE_URL } from "../apiConfig";
 
-const Login = ({ goToChat }) => {
-  const [formData, setFormData] = useState({
-    username: '',
-    password: ''
-  });
+export default function Login() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const [errors, setErrors] = useState({});
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error for this field when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    }
-    
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-    
-    return newErrors;
-  };
-
-  const handleSubmit = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    const newErrors = validateForm();
-    
-    if (Object.keys(newErrors).length === 0) {
-      console.log('Login attempt:', formData);
-      goToChat();   // move to chatbot page
-    } else {
-      setErrors(newErrors);
+
+    if (!email || !password) {
+      setError("Please fill all fields");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          role: "parent",
+        }),
+      });
+
+      const res = await response.json();
+
+      if (response.ok) {
+        localStorage.setItem("token", res.token);
+        localStorage.setItem("role", res.role);
+        localStorage.setItem("userName", res.name);
+
+        alert("Login successful as Parent");
+
+        window.location.href = "/parent-chat";
+      } else {
+        setError(res.message || "Invalid credentials!");
+      }
+    } catch (err) {
+      console.error("Login Error:", err);
+      setError("Network error. Please try again.");
     }
   };
 
   return (
     <div className="login-container">
-      {/* Animated Background Orbs */}
-      <div className="orb orb1"></div>
-      <div className="orb orb2"></div>
-      <div className="orb orb3"></div>
-
-      <div className="left-column">
-        <div className="login-card">
-          <div className="login-header">
-            <div className="login-logo">🎓</div>
-            <h2 className="form-title">Welcome Back</h2>
-            <p className="form-subtitle">Sign in to access your child's academic journey</p>
-          </div>
-
-          <form className="login-form" onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label>Username</label>
-              <div className="input-wrapper">
-                <input
-                  type="text"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  className={errors.username ? "error" : ""}
-                  placeholder="Enter your username"
-                />
-                <span className="input-icon">👤</span>
-              </div>
-              {errors.username && (
-                <span className="error-message">
-                  ⚠️ {errors.username}
-                </span>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label>Password</label>
-              <div className="input-wrapper">
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className={errors.password ? "error" : ""}
-                  placeholder="Enter your password"
-                />
-                <span className="input-icon">🔒</span>
-              </div>
-              {errors.password && (
-                <span className="error-message">
-                  ⚠️ {errors.password}
-                </span>
-              )}
-            </div>
-
-            <button type="submit" className="login-button">
-              Sign In
-            </button>
-
-            <div className="forgot-password">
-              <a href="#">Forgot your password?</a>
-            </div>
-
-            <div className="signup-link">
-              Don't have an account? <a href="#">Sign up</a>
-            </div>
-          </form>
+      <div className="login-box">
+        <div className="illustration">
+          <DotLottieReact
+            src="/Live chatbot.lottie"
+            loop
+            autoplay
+            style={{ width: "90%", height: "90%" }}
+          />
         </div>
-      </div>
 
-      <div className="right-column">
-        <div className="welcome-section">
-          <h1 className="welcome-title">Empowering Education Through Connection</h1>
-          <p className="welcome-subtitle">
-            Stay connected with your child's academic journey, track progress, and collaborate with educators seamlessly.
-          </p>
+        <form className="login-form" onSubmit={handleLogin}>
+          <h2>PTM Portal</h2>
+          <p className="subtitle">Parent Login Portal</p>
 
-          <div className="animation-container">
-            <div className="animation-card">
-              <div className="animation-icon">📊</div>
-              <div className="animation-text">Real-time Academic Insights</div>
-              
-              <div className="features-list">
-                <div className="feature-item">
-                  <div className="feature-icon">📈</div>
-                  <div className="feature-text">
-                    <div className="feature-title">Performance Tracking</div>
-                    <div className="feature-description">Monitor grades and progress</div>
-                  </div>
-                </div>
-                <div className="feature-item">
-                  <div className="feature-icon">📅</div>
-                  <div className="feature-text">
-                    <div className="feature-title">Attendance Reports</div>
-                    <div className="feature-description">Stay updated on attendance</div>
-                  </div>
-                </div>
-                <div className="feature-item">
-                  <div className="feature-icon">💬</div>
-                  <div className="feature-text">
-                    <div className="feature-title">Direct Communication</div>
-                    <div className="feature-description">Connect with teachers instantly</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+
+          <button type="submit">Login</button>
+          {error && <p className="error">{error}</p>}
+
+          <p className="footer">© 2025 PTM Portal. All rights reserved.</p>
+        </form>
       </div>
     </div>
   );
-};
-
-export default Login;
+}

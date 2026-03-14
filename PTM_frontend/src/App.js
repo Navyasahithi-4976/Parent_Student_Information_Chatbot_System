@@ -1,30 +1,21 @@
 import React, { useState } from "react";
-import Login from "./components/Login";
-import Chatbot from "./components/Chatbot";
-import Dashboard from "./components/Dashboard";
-import Attendance from "./components/Attendance";
+import PhoneVerification from "./components/PhoneVerification";
+import ChatInterface from "./components/ChatInterface";
 import "./App.css";
 
 function App() {
+  const [page, setPage] = useState("verification");
 
-  const [page, setPage] = useState("login");
-
-  const goToLogin = () => setPage("login");
-  const goToChat = () => setPage("chat");
-  const goToDashboard = () => setPage("dashboard");
-  const goToAttendance = () => setPage("attendance");
+  const goToVerification = () => setPage("verification");
+  const goToDashboard = () => {
+    console.log('Navigating to chat interface...');
+    setPage("chat");
+  };
 
   return (
     <div className="App">
-
-      {page === "login" && <Login goToChat={goToChat} />}
-      
-      {page === "chat" && <Chatbot goToDashboard={goToDashboard} />}
-      
-      {page === "dashboard" && <Dashboard onLogout={goToLogin} onNavigateToAttendance={goToAttendance} />}
-      
-      {page === "attendance" && <Attendance onBack={goToDashboard} />}
-
+      {page === "verification" && <PhoneVerification goToDashboard={goToDashboard} />}
+      {page === "chat" && <ChatInterface onLogout={goToVerification} />}
     </div>
   );
 }
