@@ -11,7 +11,7 @@ const DashboardNew = ({ onLogout }) => {
 
   const menuOptions = [
     { id: 'academic-status', title: 'Academic Status', icon: '📊' },
-    { id: 'academic-performance', title: 'Performance', icon: '📈' },
+    { id: 'academic-performance', title: 'Performance Report', icon: '📈' },
     { id: 'academic-notifications', title: 'Academic Notifications', icon: '🔔' },
     { id: 'financial-information', title: 'Financial Information', icon: '💰' },
     { id: 'communication', title: 'Communication', icon: '💬' },

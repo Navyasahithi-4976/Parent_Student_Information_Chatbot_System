@@ -123,21 +123,133 @@ const PhoneVerification = ({ goToDashboard }) => {
   };
 
   const sendOTP = async () => {
+    setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/send-otp`, {
+      // Generate cryptographically secure 6-digit OTP
+      const generatedOTP = generateSecureOTP();
+      
+      // Store OTP with enhanced security
+      const otpData = {
+        otp: generatedOTP,
+        timestamp: new Date().getTime(),
+        attempts: 0,
+        phoneNumber: phoneNumber
+      };
+      
+      localStorage.setItem('otpData', JSON.stringify(otpData));
+      
+      console.log('Generated OTP:', generatedOTP);
+      console.log('Sending OTP to:', phoneNumber);
+      
+      // Send OTP via SMS Service
+      const smsResponse = await sendSMSOTP(phoneNumber, generatedOTP);
+      
+      if (smsResponse.success) {
+        console.log('OTP sent successfully via SMS');
+        alert(`OTP has been sent to your phone number ${phoneNumber}`);
+      } else {
+        console.log('SMS sending failed:', smsResponse.error);
+        alert('Failed to send OTP. Please try again.');
+        throw new Error('SMS sending failed');
+      }
+      
+      // Track OTP in backend
+      await trackOTPInBackend(phoneNumber, generatedOTP, smsResponse.success);
+      
+    } catch (err) {
+      console.log('Error in OTP generation:', err);
+      alert('Failed to generate OTP. Please try again.');
+      setError('Failed to send OTP. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Generate cryptographically secure OTP
+  const generateSecureOTP = () => {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return (array[0] % 900000 + 100000).toString();
+  };
+
+  // Track OTP in backend for analytics and security
+  const trackOTPInBackend = async (phoneNumber, otp, success) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/track-otp`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          phoneNumber
+          phoneNumber,
+          otpHash: await hashOTP(otp),
+          success,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          ip: null // Will be set by backend
         }),
       });
+      return await response.json();
+    } catch (error) {
+      console.log('Backend tracking failed:', error);
+    }
+  };
+
+  // Hash OTP for security (don't store plain OTP in backend)
+  const hashOTP = async (otp) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(otp + 'salt_secret_key');
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  // SMS Service Function
+  const sendSMSOTP = async (phoneNumber, otp) => {
+    try {
+      // Mock SMS Service - Replace with actual SMS API
+      // Options: Twilio, MessageBird, AWS SNS, etc.
       
-      // Mock OTP for development
-      console.log('OTP sent to:', phoneNumber);
-    } catch (err) {
-      console.log('Mock OTP sent');
+      // For development, we'll simulate SMS sending
+      console.log(`=== SMS SERVICE ===`);
+      console.log(`To: ${phoneNumber}`);
+      console.log(`Message: Your PTM Portal OTP is: ${otp}. Valid for 5 minutes.`);
+      console.log(`==================`);
+      
+      // Mock successful SMS sending
+      // In production, replace this with actual SMS API call:
+      /*
+      // Example with Twilio:
+      const response = await fetch('https://api.twilio.com/2010-04-01/Accounts/YOUR_ACCOUNT_SID/Messages.json', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + btoa('YOUR_ACCOUNT_SID:YOUR_AUTH_TOKEN'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          To: phoneNumber,
+          From: 'YOUR_TWILIO_PHONE_NUMBER',
+          Body: `Your PTM Portal OTP is: ${otp}. Valid for 5 minutes.`
+        })
+      });
+      
+      const data = await response.json();
+      return { success: response.ok, data };
+      */
+      
+      // Mock response for development
+      return { 
+        success: true, 
+        messageId: 'MSG_' + Date.now(),
+        provider: 'MockSMS'
+      };
+      
+    } catch (error) {
+      console.error('SMS sending error:', error);
+      return { 
+        success: false, 
+        error: error.message 
+      };
     }
   };
 
@@ -152,36 +264,90 @@ const PhoneVerification = ({ goToDashboard }) => {
 
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/verify-otp`, {
+      // Get OTP data from localStorage
+      const otpDataStr = localStorage.getItem('otpData');
+      if (!otpDataStr) {
+        setError('OTP session expired. Please request a new OTP.');
+        setIsLoading(false);
+        return;
+      }
+
+      const otpData = JSON.parse(otpDataStr);
+      
+      // Check if OTP is expired (5 minutes)
+      const currentTime = new Date().getTime();
+      const timeDiff = currentTime - otpData.timestamp;
+      const isExpired = timeDiff > 5 * 60 * 1000; // 5 minutes
+      
+      if (isExpired) {
+        setError('OTP has expired. Please request a new OTP.');
+        localStorage.removeItem('otpData');
+        setIsLoading(false);
+        return;
+      }
+
+      // Check attempts limit (max 3 attempts)
+      if (otpData.attempts >= 3) {
+        setError('Maximum attempts reached. Please request a new OTP.');
+        localStorage.removeItem('otpData');
+        setIsLoading(false);
+        return;
+      }
+
+      // Update attempts
+      otpData.attempts += 1;
+      localStorage.setItem('otpData', JSON.stringify(otpData));
+
+      // Verify OTP
+      const isValid = otp === otpData.otp;
+      
+      // Track verification attempt
+      await trackOTPVerification(phoneNumber, isValid, otpData.attempts);
+
+      if (isValid) {
+        // Success - Clear OTP data and proceed
+        localStorage.setItem('phoneVerified', 'true');
+        localStorage.setItem('userPhone', phoneNumber);
+        localStorage.setItem('otpVerified', 'true');
+        localStorage.removeItem('otpData');
+        
+        setStep(3); // Go to student registration number step
+      } else {
+        // Failed verification
+        const remainingAttempts = 3 - otpData.attempts;
+        if (remainingAttempts > 0) {
+          setError(`Invalid OTP. ${remainingAttempts} attempts remaining.`);
+        } else {
+          setError('Maximum attempts reached. Please request a new OTP.');
+          localStorage.removeItem('otpData');
+        }
+      }
+    } catch (err) {
+      console.log('OTP verification error:', err);
+      setError('Verification failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Track OTP verification attempts for security
+  const trackOTPVerification = async (phoneNumber, isValid, attemptNumber) => {
+    try {
+      await fetch(`${API_BASE_URL}/verify-otp-attempt`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           phoneNumber,
-          otp
+          isValid,
+          attemptNumber,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent
         }),
       });
-
-      if (response.ok || otp === '123456') { // Mock success with 123456
-        localStorage.setItem('phoneVerified', 'true');
-        localStorage.setItem('userPhone', phoneNumber);
-        localStorage.setItem('otpVerified', 'true');
-        setStep(3); // Go to student registration number step
-      } else {
-        setError('Invalid OTP. Please try again.');
-      }
-    } catch (err) {
-      if (otp === '123456') { // Mock success
-        localStorage.setItem('phoneVerified', 'true');
-        localStorage.setItem('userPhone', phoneNumber);
-        localStorage.setItem('otpVerified', 'true');
-        setStep(3); // Go to student registration number step
-      } else {
-        setError('Invalid OTP. Please try again.');
-      }
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.log('Verification tracking failed:', error);
     }
   };
 

@@ -3,12 +3,22 @@ import './ChatInterface.css';
 
 const ChatInterface = ({ onLogout }) => {
   const [messages, setMessages] = useState([
-    { id: 1, sender: 'bot', text: 'Hello! Welcome to PTM Portal. How can I help you today?', time: '10:00 AM' }
+    { 
+      id: 1, 
+      sender: 'bot', 
+      text: 'Hello! I\'m Viggy, your Parent Assistant. How can I help you today?', 
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      status: 'delivered'
+    }
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [userIsTyping, setUserIsTyping] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState('connected');
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   const quickReplies = [
     'Academic Status',
@@ -19,6 +29,47 @@ const ChatInterface = ({ onLogout }) => {
     'Support'
   ];
 
+  // Simulate real-time connection
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setConnectionStatus(prev => {
+        const statuses = ['connected', 'connecting', 'connected'];
+        return statuses[Math.floor(Math.random() * statuses.length)];
+      });
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Simulate bot typing indicator
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (Math.random() > 0.8 && !isTyping) {
+        setIsTyping(true);
+        setTimeout(() => setIsTyping(false), 2000);
+      }
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [isTyping]);
+
+  // Handle user typing indicator
+  const handleInputChange = (e) => {
+    setInputMessage(e.target.value);
+    
+    if (!userIsTyping && e.target.value.length > 0) {
+      setUserIsTyping(true);
+    }
+    
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Set new timeout to stop typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      setUserIsTyping(false);
+    }, 1000);
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -27,6 +78,19 @@ const ChatInterface = ({ onLogout }) => {
     scrollToBottom();
   }, [messages]);
 
+  const simulateBotResponse = (userMessage) => {
+    const responses = [
+      'I understand your query. Let me help you with that.',
+      'That\'s a great question! Here\'s what I can tell you...',
+      'I\'m here to assist you with PTM Portal services.',
+      'Let me check that information for you.',
+      'Based on your request, I can help you with...',
+      'Thank you for asking. Here\'s the information you need...'
+    ];
+    
+    return responses[Math.floor(Math.random() * responses.length)];
+  };
+
   const handleSendMessage = (e) => {
     e.preventDefault();
     if (inputMessage.trim()) {
@@ -34,33 +98,29 @@ const ChatInterface = ({ onLogout }) => {
         id: messages.length + 1,
         sender: 'user',
         text: inputMessage,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: 'sent'
       };
       
-      setMessages([...messages, newMessage]);
+      setMessages(prev => [...prev, newMessage]);
       setInputMessage('');
+      setUserIsTyping(false);
       setIsTyping(true);
       
-      // Simulate bot response
+      // Simulate real-time bot response with variable delay
+      const responseDelay = Math.random() * 2000 + 1000; // 1-3 seconds
       setTimeout(() => {
-        const responses = [
-          'I understand your query. Let me help you with that.',
-          'That\'s a great question! Here\'s what I can tell you...',
-          'I\'m here to assist you with PTM Portal services.',
-          'Let me check that information for you.',
-          'Thank you for your message. How else can I help?'
-        ];
-        
         const botResponse = {
           id: messages.length + 2,
           sender: 'bot',
-          text: responses[Math.floor(Math.random() * responses.length)],
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          text: simulateBotResponse(inputMessage),
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          status: 'delivered'
         };
         
         setMessages(prev => [...prev, botResponse]);
         setIsTyping(false);
-      }, 1500);
+      }, responseDelay);
     }
   };
 
@@ -69,10 +129,16 @@ const ChatInterface = ({ onLogout }) => {
     inputRef.current?.focus();
   };
 
+  // Simulate real-time status updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsOnline(prev => Math.random() > 0.1);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <>
-      <div className="chat-overlay"></div>
-      <div className="chat-container">
+    <div className="chat-container">
       {/* Chat Header */}
       <header className="chat-header">
         <div className="header-info">
@@ -80,13 +146,21 @@ const ChatInterface = ({ onLogout }) => {
             <span>🤖</span>
           </div>
           <div className="user-details">
-            <h3>PTM Assistant</h3>
-            <span className="status">Online</span>
+            <h3>Viggy - Parent Assistant</h3>
+            <span className="status">
+              {isOnline ? 'Online' : 'Away'}
+              {userIsTyping && ' • Typing...'}
+            </span>
           </div>
         </div>
-        <button className="menu-btn" onClick={onLogout}>
-          <span>⋮</span>
-        </button>
+        <div className="header-actions">
+          <div className={`connection-indicator ${connectionStatus}`}>
+            <span className="connection-dot"></span>
+          </div>
+          <button className="menu-btn" onClick={onLogout}>
+            <span>⋮</span>
+          </button>
+        </div>
       </header>
 
       {/* Messages Area */}
@@ -94,39 +168,37 @@ const ChatInterface = ({ onLogout }) => {
         <div className="messages-container">
           {messages.map((message) => (
             <div key={message.id} className={`message ${message.sender}`}>
-              {message.sender === 'bot' && (
-                <div className="avatar">
-                  <span>🤖</span>
-                </div>
-              )}
               <div className="message-content">
                 <div className="message-bubble">
                   {message.text}
+                  <div className="message-info">
+                    <span className="message-time">{message.time}</span>
+                    {message.sender === 'user' && (
+                      <span className={`message-status ${message.status}`}>
+                        {message.status === 'sent' ? '✓' : '✓✓'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <span className="message-time">{message.time}</span>
               </div>
-              {message.sender === 'user' && (
-                <div className="avatar user-avatar">
-                  <span>👤</span>
-                </div>
-              )}
             </div>
           ))}
           
+          {/* Typing Indicator */}
           {isTyping && (
             <div className="message bot">
-              <div className="avatar">
-                <span>🤖</span>
-              </div>
               <div className="message-content">
-                <div className="typing-indicator">
-                  <span></span>
-                  <span></span>
-                  <span></span>
+                <div className="typing-bubble">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
+          
           <div ref={messagesEndRef} />
         </div>
       </main>
@@ -144,7 +216,7 @@ const ChatInterface = ({ onLogout }) => {
         ))}
       </div>
 
-      {/* Input Area */}
+      {/* Chat Input */}
       <footer className="chat-input">
         <form onSubmit={handleSendMessage}>
           <div className="input-container">
@@ -155,7 +227,7 @@ const ChatInterface = ({ onLogout }) => {
               ref={inputRef}
               type="text"
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              onChange={handleInputChange}
               placeholder="Type a message..."
               className="message-input"
             />
@@ -168,8 +240,7 @@ const ChatInterface = ({ onLogout }) => {
           </div>
         </form>
       </footer>
-      </div>
-    </>
+    </div>
   );
 };
 
